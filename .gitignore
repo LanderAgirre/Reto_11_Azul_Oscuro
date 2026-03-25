@@ -1,0 +1,11 @@
+__pycache__/
+Datos/
+Graficos/
+Resultados/
+*.db
+.venv/
+venv/
+env/
+*.csv
+Modelos/
+*.ipynb_checkpoints/

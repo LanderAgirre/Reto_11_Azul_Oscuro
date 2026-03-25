@@ -1,0 +1,643 @@
+[
+    {
+        "id": "b4f5a7c4e0317a3c",
+        "type": "tab",
+        "label": "Analisis del Agente",
+        "disabled": false,
+        "info": "Dashboard para analizar los resultados del objetivo de RL"
+    },
+    {
+        "id": "032d6836ac18d7b4",
+        "type": "ui_button",
+        "z": "b4f5a7c4e0317a3c",
+        "name": "Boton Iniciar V1",
+        "group": "grupo_v1_final",
+        "order": 1,
+        "width": "8",
+        "height": "1",
+        "passthru": false,
+        "label": "Iniciar Simulacion del Agente 1",
+        "tooltip": "",
+        "color": "white",
+        "bgcolor": "#1f77b4",
+        "icon": "rocket_launch",
+        "payload": "true",
+        "payloadType": "bool",
+        "topic": "topic",
+        "topicType": "msg",
+        "x": 170,
+        "y": 200,
+        "wires": [
+            [
+                "714ecb99eef25d41"
+            ]
+        ]
+    },
+    {
+        "id": "59e7058f38a45d10",
+        "type": "ui_button",
+        "z": "b4f5a7c4e0317a3c",
+        "name": "Boton Cambiar Vista V1",
+        "group": "grupo_v1_final",
+        "order": 2,
+        "width": "4",
+        "height": "1",
+        "passthru": false,
+        "label": "Ver en 2D / 3D",
+        "tooltip": "",
+        "color": "white",
+        "bgcolor": "#666666",
+        "icon": "map",
+        "payload": "{\"command\":\"toggle_view\"}",
+        "payloadType": "json",
+        "topic": "topic",
+        "topicType": "msg",
+        "x": 1060,
+        "y": 100,
+        "wires": [
+            [
+                "c801f30ee40db42a"
+            ]
+        ]
+    },
+    {
+        "id": "714ecb99eef25d41",
+        "type": "exec",
+        "z": "b4f5a7c4e0317a3c",
+        "command": "cat /data/Datos_v1.csv",
+        "addpay": "",
+        "append": "",
+        "useSpawn": "false",
+        "timer": "",
+        "winHide": false,
+        "oldrc": false,
+        "name": "Leer Base de Datos V1",
+        "x": 390,
+        "y": 200,
+        "wires": [
+            [
+                "a0bbcdc1182b79c9"
+            ],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "a0bbcdc1182b79c9",
+        "type": "function",
+        "z": "b4f5a7c4e0317a3c",
+        "name": "Preparar Entorno V1",
+        "func": "let x = [], y = [], z = [];\nconst step = 20;\nif (typeof msg.payload === 'string') {\n    let lines = msg.payload.split(/\\r?\\n/);\n    for(let i = 1; i < lines.length; i += step) {\n        let cols = lines[i].split(',');\n        if(cols.length >= 4) {\n            let v1 = parseFloat(cols[1]);\n            let v2 = parseFloat(cols[2]);\n            let w = parseFloat(cols[3]);\n            if(!isNaN(v1) && !isNaN(v2) && !isNaN(w)) { x.push(v1); y.push(v2); z.push(w); }\n        }\n    }\n}\nlet color = '#ff7f0e';\nreturn [\n    { payload: { command: \"init\", x: x, y: y, z: z, color: color } },\n    { payload: true },\n    { payload: { command: \"init_2d\" } },\n    { payload: { command: \"init_top5\" } }\n];",
+        "outputs": 4,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 650,
+        "y": 220,
+        "wires": [
+            [
+                "c801f30ee40db42a"
+            ],
+            [
+                "43a0484ba697f95b"
+            ],
+            [
+                "c63a0676ace10ed8"
+            ],
+            [
+                "b132eeea3dbb13a5"
+            ]
+        ]
+    },
+    {
+        "id": "43a0484ba697f95b",
+        "type": "exec",
+        "z": "b4f5a7c4e0317a3c",
+        "command": "cat /data/ruta1.csv",
+        "addpay": "",
+        "append": "",
+        "useSpawn": "false",
+        "timer": "",
+        "winHide": false,
+        "oldrc": false,
+        "name": "Cargar Trayectoria V1",
+        "x": 890,
+        "y": 280,
+        "wires": [
+            [
+                "3e9ca59a01c81906"
+            ],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "3e9ca59a01c81906",
+        "type": "function",
+        "z": "b4f5a7c4e0317a3c",
+        "name": "Ejecutar Simulacion V1",
+        "func": "let ctx = flow.get(\"sim_fin_v1\") || {};\nif (ctx.interval) clearInterval(ctx.interval);\nlet raw = msg.payload;\nif (!raw || raw.includes(\"No such file\")) return null;\nlet sep = raw.includes(';') ? ';' : ',';\nlet lines = raw.split(/\\r?\\n/);\nlet ruta = [];\nfor(let i = 1; i < lines.length; i++) {\n    if(lines[i].trim() === \"\") continue;\n    let c = lines[i].split(sep);\n    let offset = c.length >= 4 ? 1 : 0;\n    if(c.length >= 3) {\n        let v1 = parseFloat(c[offset].replace(/['\"]+/g, '').trim());\n        let v2 = parseFloat(c[offset+1].replace(/['\"]+/g, '').trim());\n        let w = parseFloat(c[offset+2].replace(/['\"]+/g, '').trim());\n        if(!isNaN(v1) && !isNaN(v2) && !isNaN(w)) ruta.push({ v1: v1, v2: v2, w: w, paso: i });\n    }\n}\nif (ruta.length === 0) return null;\nctx.top5 = [];\nlet i = 0;\nctx.interval = setInterval(() => {\n    if (i >= ruta.length) {\n        clearInterval(ctx.interval);\n        return;\n    }\n    let pt = ruta[i];\n    ctx.top5.push(pt);\n    ctx.top5.sort((a,b) => a.w - b.w);\n    if (ctx.top5.length > 5) ctx.top5.pop();\n    node.send([\n        { payload: { command: \"add_point\", pt: pt } },\n        { payload: pt.v1 },\n        { payload: pt.v2 },\n        { payload: { paso: i, w: pt.w.toFixed(4) } },\n        { payload: { command: \"add_point_2d\", x: i, y: pt.w } },\n        { payload: { command: \"update_top5\", data: ctx.top5 } }\n    ]);\n    i++;\n}, 100);\nflow.set(\"sim_fin_v1\", ctx);\nnode.on(\"close\", () => { if(ctx.interval) clearInterval(ctx.interval); });\nreturn null;",
+        "outputs": 6,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1160,
+        "y": 200,
+        "wires": [
+            [
+                "c801f30ee40db42a"
+            ],
+            [
+                "e7ab06d3a36681df"
+            ],
+            [
+                "1514be28472fa5f9"
+            ],
+            [
+                "e7a19847eaa24dc9"
+            ],
+            [
+                "c63a0676ace10ed8"
+            ],
+            [
+                "b132eeea3dbb13a5"
+            ]
+        ]
+    },
+    {
+        "id": "c801f30ee40db42a",
+        "type": "ui_template",
+        "z": "b4f5a7c4e0317a3c",
+        "group": "grupo_v1_final",
+        "name": "Grafico Espacial V1",
+        "order": 3,
+        "width": "12",
+        "height": "10",
+        "format": "<script src=\"https://cdn.plot.ly/plotly-2.32.0.min.js\"></script>\n<div id=\"plot-v1-fin\" style=\"width:100%; height:100%; min-height:400px;\"></div>\n<script>\n(function(scope) {\n    scope.view2d = false;\n    scope.mesh = {x:[], y:[], z:[]};\n    scope.route = {x:[], y:[], z:[]};\n    scope.color = '#ff7f0e';\n    scope.renderPlot = function() {\n        if(typeof Plotly === 'undefined') { setTimeout(scope.renderPlot, 200); return; }\n        var traces = [];\n        var layout = { margin: {l:20, r:20, b:20, t:40}, title: scope.view2d ? 'Vista Plana del Recorrido' : 'Espacio de Busqueda en 3D' };\n        if(scope.view2d) {\n            traces.push({ x: scope.mesh.x, y: scope.mesh.y, mode: 'markers', marker: {color: scope.mesh.z, colorscale: 'Viridis', size: 4, opacity: 0.4}, type: 'scattergl', name: 'Area de Trabajo' });\n            traces.push({ x: scope.route.x, y: scope.route.y, mode: 'lines+markers', line: {color: scope.color, width: 3}, marker: {color: scope.color, size: 6}, type: 'scattergl', name: 'Camino del Agente' });\n            layout.xaxis = {title: 'Primera Variable'}; layout.yaxis = {title: 'Segunda Variable'}; layout.plot_bgcolor = '#f4f4f4';\n        } else {\n            traces.push({ x: scope.mesh.x, y: scope.mesh.y, z: scope.mesh.z, mode: 'markers', marker: {color: scope.mesh.z, colorscale: 'Viridis', size: 2.5, opacity: 0.15}, type: 'scatter3d', name: 'Area de Trabajo' });\n            traces.push({ x: scope.route.x, y: scope.route.y, z: scope.route.z, mode: 'lines+markers', line: {color: scope.color, width: 6}, marker: {color: scope.color, size: 5}, type: 'scatter3d', name: 'Camino del Agente' });\n            layout.scene = { xaxis: {title: 'Variable 1'}, yaxis: {title: 'Variable 2'}, zaxis: {title: 'Energia (W)'} };\n        }\n        Plotly.react('plot-v1-fin', traces, layout, {responsive: true});\n    };\n    scope.$watch('msg', function(msg) {\n        if(!msg || !msg.payload) return;\n        if(msg.payload.command === 'init') {\n            scope.mesh = {x: msg.payload.x, y: msg.payload.y, z: msg.payload.z};\n            scope.route = {x:[], y:[], z:[]};\n            scope.color = msg.payload.color;\n            scope.renderPlot();\n        } else if(msg.payload.command === 'add_point') {\n            if(typeof Plotly === 'undefined') return;\n            var pt = msg.payload.pt;\n            scope.route.x.push(pt.v1); scope.route.y.push(pt.v2); scope.route.z.push(pt.w);\n            if(scope.view2d) {\n                Plotly.extendTraces('plot-v1-fin', { x: [[pt.v1]], y: [[pt.v2]] }, [1]);\n            } else {\n                Plotly.extendTraces('plot-v1-fin', { x: [[pt.v1]], y: [[pt.v2]], z: [[pt.w]] }, [1]);\n            }\n        } else if(msg.payload.command === 'toggle_view') {\n            scope.view2d = !scope.view2d;\n            scope.renderPlot();\n        }\n    });\n})(scope);\n</script>",
+        "storeOutMessages": true,
+        "fwdInMessages": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 1500,
+        "y": 100,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "e7ab06d3a36681df",
+        "type": "ui_gauge",
+        "z": "b4f5a7c4e0317a3c",
+        "name": "Medidor Variable 1",
+        "group": "grupo_v1_final",
+        "order": 4,
+        "width": "6",
+        "height": "3",
+        "gtype": "gage",
+        "title": "Variable 1",
+        "label": "",
+        "format": "{{value}}",
+        "min": 0,
+        "max": "700",
+        "colors": [
+            "#00b500",
+            "#e6e600",
+            "#ca3838"
+        ],
+        "seg1": "",
+        "seg2": "",
+        "diff": false,
+        "className": "",
+        "x": 1480,
+        "y": 140,
+        "wires": []
+    },
+    {
+        "id": "1514be28472fa5f9",
+        "type": "ui_gauge",
+        "z": "b4f5a7c4e0317a3c",
+        "name": "Medidor Variable 2",
+        "group": "grupo_v1_final",
+        "order": 5,
+        "width": "6",
+        "height": "3",
+        "gtype": "gage",
+        "title": "Variable 2",
+        "label": "",
+        "format": "{{value}}",
+        "min": 0,
+        "max": "400",
+        "colors": [
+            "#00b500",
+            "#e6e600",
+            "#ca3838"
+        ],
+        "seg1": "",
+        "seg2": "",
+        "diff": false,
+        "className": "",
+        "x": 1480,
+        "y": 180,
+        "wires": []
+    },
+    {
+        "id": "e7a19847eaa24dc9",
+        "type": "ui_template",
+        "z": "b4f5a7c4e0317a3c",
+        "group": "grupo_v1_final",
+        "name": "Panel de Progreso V1",
+        "order": 6,
+        "width": "12",
+        "height": "3",
+        "format": "<div style=\"display:flex; flex-direction:row; justify-content:center; align-items:center; height:100%; background:#f4f4f4; border-radius:8px; box-sizing:border-box; padding:10px;\">\n    <div style=\"flex: 1; text-align:center;\">\n        <div style=\"font-size:14px; color:#666; font-weight:bold; text-transform:uppercase;\">Progreso del Agente</div>\n        <div style=\"font-size:42px; font-weight:bold; color:#333; line-height:1; margin-top:8px;\">{{msg.payload.paso !== undefined ? msg.payload.paso : '-'}}</div>\n    </div>\n    <div style=\"width:2px; height:80%; background:#ccc;\"></div>\n    <div style=\"flex: 1; text-align:center;\">\n        <div style=\"font-size:14px; color:#666; font-weight:bold; text-transform:uppercase;\">Energia Utilizada (W)</div>\n        <div style=\"font-size:42px; font-weight:bold; color:#ff7f0e; line-height:1; margin-top:8px;\">{{msg.payload.w !== undefined ? msg.payload.w : '-'}}</div>\n    </div>\n</div>",
+        "storeOutMessages": true,
+        "fwdInMessages": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 1500,
+        "y": 220,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "c63a0676ace10ed8",
+        "type": "ui_template",
+        "z": "b4f5a7c4e0317a3c",
+        "group": "grupo_v1_final",
+        "name": "Grafica de Evolucion V1",
+        "order": 7,
+        "width": "12",
+        "height": "5",
+        "format": "<script src=\"https://cdn.plot.ly/plotly-2.32.0.min.js\"></script>\n<div id=\"line-v1-fin\" style=\"width:100%; height:100%; min-height:200px;\"></div>\n<script>\n(function(scope) {\n    scope.$watch('msg', function(msg) {\n        if(!msg || !msg.payload) return;\n        if(msg.payload.command === 'init_2d') {\n            var tryInitLine = function() {\n                if(typeof Plotly === 'undefined') { setTimeout(tryInitLine, 200); return; }\n                var trace = { x: [], y: [], mode: 'lines', line: {color: '#ff7f0e', width: 2} };\n                var layout = { margin: {l:50, r:20, b:40, t:20}, xaxis: {title: 'Tiempo de Simulacion'}, yaxis: {title: 'Consumo (W)'} };\n                Plotly.newPlot('line-v1-fin', [trace], layout, {responsive:true});\n            };\n            tryInitLine();\n        }\n        else if(msg.payload.command === 'add_point_2d') {\n            if(typeof Plotly !== 'undefined') {\n                Plotly.extendTraces('line-v1-fin', { x: [[msg.payload.x]], y: [[msg.payload.y]] }, [0]);\n            }\n        }\n    });\n})(scope);\n</script>",
+        "storeOutMessages": true,
+        "fwdInMessages": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 1510,
+        "y": 260,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "b132eeea3dbb13a5",
+        "type": "ui_template",
+        "z": "b4f5a7c4e0317a3c",
+        "group": "grupo_v1_final",
+        "name": "Mejores Resultados V1",
+        "order": 8,
+        "width": "12",
+        "height": "6",
+        "format": "<script src=\"https://cdn.plot.ly/plotly-2.32.0.min.js\"></script>\n<div id=\"top5-v1-fin\" style=\"width:100%; height:100%; min-height:240px;\"></div>\n<script>\n(function(scope) {\n    var getLayout = function() {\n        return {\n            title: 'Los 5 Diseños mas Eficientes',\n            margin: {l:70, r:30, b:40, t:40},\n            xaxis: {\n                title: 'Consumo entre 20W y 23W',\n                range: [20, 23],\n                autorange: false\n            },\n            yaxis: {\n                type: 'category',\n                autorange: 'reversed'\n            },\n            plot_bgcolor: '#f9f9f9'\n        };\n    };\n    scope.$watch('msg', function(msg) {\n        if(!msg || !msg.payload) return;\n        if(msg.payload.command === 'init_top5') {\n            var tryInitTop = function() {\n                if(typeof Plotly === 'undefined') { setTimeout(tryInitTop, 200); return; }\n                Plotly.newPlot('top5-v1-fin', [], getLayout(), {responsive:true});\n            };\n            tryInitTop();\n        }\n        else if(msg.payload.command === 'update_top5') {\n            if(typeof Plotly === 'undefined') return;\n            var data = msg.payload.data;\n            var x_vals = data.map(function(d) { return d.w; });\n            var y_vals = data.map(function(d) { return 'Paso ' + d.paso; });\n            var trace = {\n                x: x_vals,\n                y: y_vals,\n                type: 'bar',\n                orientation: 'h',\n                marker: { color: '#ff7f0e' },\n                text: x_vals.map(function(v) { return v.toFixed(3) + ' W'; }),\n                hoverinfo: 'text',\n                textposition: 'inside',\n                insidetextanchor: 'end',\n                textfont: {color: 'white', size: 14}\n            };\n            Plotly.react('top5-v1-fin', [trace], getLayout());\n        }\n    });\n})(scope);\n</script>",
+        "storeOutMessages": true,
+        "fwdInMessages": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 1500,
+        "y": 300,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "a749a24b1dae3b4f",
+        "type": "ui_button",
+        "z": "b4f5a7c4e0317a3c",
+        "name": "Boton Iniciar V2",
+        "group": "grupo_v2_final",
+        "order": 1,
+        "width": "8",
+        "height": "1",
+        "passthru": false,
+        "label": "Iniciar Simulacion del Agente 2",
+        "tooltip": "",
+        "color": "white",
+        "bgcolor": "#2ca02c",
+        "className": "",
+        "icon": "play_arrow",
+        "payload": "true",
+        "payloadType": "bool",
+        "topic": "topic",
+        "topicType": "msg",
+        "x": 170,
+        "y": 440,
+        "wires": [
+            [
+                "c62b5e8de0d53ebf"
+            ]
+        ]
+    },
+    {
+        "id": "88b0505db8525ac5",
+        "type": "ui_button",
+        "z": "b4f5a7c4e0317a3c",
+        "name": "Boton Cambiar Vista V2",
+        "group": "grupo_v2_final",
+        "order": 2,
+        "width": "4",
+        "height": "1",
+        "passthru": false,
+        "label": "Ver en 2D / 3D",
+        "tooltip": "",
+        "color": "white",
+        "bgcolor": "#666666",
+        "icon": "map",
+        "payload": "{\"command\":\"toggle_view\"}",
+        "payloadType": "json",
+        "topic": "topic",
+        "topicType": "msg",
+        "x": 1080,
+        "y": 360,
+        "wires": [
+            [
+                "a82bfa60af0051be"
+            ]
+        ]
+    },
+    {
+        "id": "c62b5e8de0d53ebf",
+        "type": "exec",
+        "z": "b4f5a7c4e0317a3c",
+        "command": "cat /data/Datos_v2.csv",
+        "addpay": "",
+        "append": "",
+        "useSpawn": "false",
+        "timer": "",
+        "winHide": false,
+        "oldrc": false,
+        "name": "Leer Base de Datos V2",
+        "x": 380,
+        "y": 440,
+        "wires": [
+            [
+                "a3a6b3ecd7014380"
+            ],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "a3a6b3ecd7014380",
+        "type": "function",
+        "z": "b4f5a7c4e0317a3c",
+        "name": "Preparar Entorno V2",
+        "func": "let x = [], y = [], z = [];\nconst step = 20;\nif (typeof msg.payload === 'string') {\n    let lines = msg.payload.split(/\\r?\\n/);\n    for(let i = 1; i < lines.length; i += step) {\n        let cols = lines[i].split(',');\n        if(cols.length >= 4) {\n            let v1 = parseFloat(cols[1]);\n            let v2 = parseFloat(cols[2]);\n            let w = parseFloat(cols[3]);\n            if(!isNaN(v1) && !isNaN(v2) && !isNaN(w)) { x.push(v1); y.push(v2); z.push(w); }\n        }\n    }\n}\nlet color = '#2ca02c';\nreturn [\n    { payload: { command: \"init\", x: x, y: y, z: z, color: color } },\n    { payload: true },\n    { payload: { command: \"init_2d\" } },\n    { payload: { command: \"init_top5\" } }\n];",
+        "outputs": 4,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 630,
+        "y": 480,
+        "wires": [
+            [
+                "a82bfa60af0051be"
+            ],
+            [
+                "418700db9b2873b4"
+            ],
+            [
+                "a96e76133fee7b14"
+            ],
+            [
+                "d28a4d04be03e605"
+            ]
+        ]
+    },
+    {
+        "id": "418700db9b2873b4",
+        "type": "exec",
+        "z": "b4f5a7c4e0317a3c",
+        "command": "cat /data/ruta2.csv",
+        "addpay": "",
+        "append": "",
+        "useSpawn": "false",
+        "timer": "",
+        "winHide": false,
+        "oldrc": false,
+        "name": "Cargar Trayectoria V2",
+        "x": 870,
+        "y": 520,
+        "wires": [
+            [
+                "90a8b7d5249ba022"
+            ],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "90a8b7d5249ba022",
+        "type": "function",
+        "z": "b4f5a7c4e0317a3c",
+        "name": "Ejecutar Simulacion V2",
+        "func": "let ctx = flow.get(\"sim_fin_v2\") || {};\nif (ctx.interval) clearInterval(ctx.interval);\nlet raw = msg.payload;\nif (!raw || raw.includes(\"No such file\")) return null;\nlet sep = raw.includes(';') ? ';' : ',';\nlet lines = raw.split(/\\r?\\n/);\nlet ruta = [];\nfor(let i = 1; i < lines.length; i++) {\n    if(lines[i].trim() === \"\") continue;\n    let c = lines[i].split(sep);\n    let offset = c.length >= 4 ? 1 : 0;\n    if(c.length >= 3) {\n        let v1 = parseFloat(c[offset].replace(/['\"]+/g, '').trim());\n        let v2 = parseFloat(c[offset+1].replace(/['\"]+/g, '').trim());\n        let w = parseFloat(c[offset+2].replace(/['\"]+/g, '').trim());\n        if(!isNaN(v1) && !isNaN(v2) && !isNaN(w)) ruta.push({ v1: v1, v2: v2, w: w, paso: i });\n    }\n}\nif (ruta.length === 0) return null;\nctx.top5 = [];\nlet i = 0;\nctx.interval = setInterval(() => {\n    if (i >= ruta.length) {\n        clearInterval(ctx.interval);\n        return;\n    }\n    let pt = ruta[i];\n    ctx.top5.push(pt);\n    ctx.top5.sort((a,b) => a.w - b.w);\n    if (ctx.top5.length > 5) ctx.top5.pop();\n    node.send([\n        { payload: { command: \"add_point\", pt: pt } },\n        { payload: pt.v1 },\n        { payload: pt.v2 },\n        { payload: { paso: i, w: pt.w.toFixed(4) } },\n        { payload: { command: \"add_point_2d\", x: i, y: pt.w } },\n        { payload: { command: \"update_top5\", data: ctx.top5 } }\n    ]);\n    i++;\n}, 100);\nflow.set(\"sim_fin_v2\", ctx);\nnode.on(\"close\", () => { if(ctx.interval) clearInterval(ctx.interval); });\nreturn null;",
+        "outputs": 6,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1100,
+        "y": 440,
+        "wires": [
+            [
+                "a82bfa60af0051be"
+            ],
+            [
+                "9caceb4290435d15"
+            ],
+            [
+                "45539fb141d1ed51"
+            ],
+            [
+                "20fb8407892a18c4"
+            ],
+            [
+                "a96e76133fee7b14"
+            ],
+            [
+                "d28a4d04be03e605"
+            ]
+        ]
+    },
+    {
+        "id": "a82bfa60af0051be",
+        "type": "ui_template",
+        "z": "b4f5a7c4e0317a3c",
+        "group": "grupo_v2_final",
+        "name": "Grafico Espacial V2",
+        "order": 3,
+        "width": "12",
+        "height": "10",
+        "format": "<script src=\"https://cdn.plot.ly/plotly-2.32.0.min.js\"></script>\n<div id=\"plot-v2-fin\" style=\"width:100%; height:100%; min-height:400px;\"></div>\n<script>\n(function(scope) {\n    scope.view2d = false;\n    scope.mesh = {x:[], y:[], z:[]};\n    scope.route = {x:[], y:[], z:[]};\n    scope.color = '#2ca02c';\n    scope.renderPlot = function() {\n        if(typeof Plotly === 'undefined') { setTimeout(scope.renderPlot, 200); return; }\n        var traces = [];\n        var layout = { margin: {l:20, r:20, b:20, t:40}, title: scope.view2d ? 'Vista Plana del Recorrido' : 'Espacio de Busqueda en 3D' };\n        if(scope.view2d) {\n            traces.push({ x: scope.mesh.x, y: scope.mesh.y, mode: 'markers', marker: {color: scope.mesh.z, colorscale: 'Viridis', size: 4, opacity: 0.4}, type: 'scattergl', name: 'Area de Trabajo' });\n            traces.push({ x: scope.route.x, y: scope.route.y, mode: 'lines+markers', line: {color: scope.color, width: 3}, marker: {color: scope.color, size: 6}, type: 'scattergl', name: 'Camino del Agente' });\n            layout.xaxis = {title: 'Primera Variable'}; layout.yaxis = {title: 'Segunda Variable'}; layout.plot_bgcolor = '#f4f4f4';\n        } else {\n            traces.push({ x: scope.mesh.x, y: scope.mesh.y, z: scope.mesh.z, mode: 'markers', marker: {color: scope.mesh.z, colorscale: 'Viridis', size: 2.5, opacity: 0.15}, type: 'scatter3d', name: 'Area de Trabajo' });\n            traces.push({ x: scope.route.x, y: scope.route.y, z: scope.route.z, mode: 'lines+markers', line: {color: scope.color, width: 6}, marker: {color: scope.color, size: 5}, type: 'scatter3d', name: 'Camino del Agente' });\n            layout.scene = { xaxis: {title: 'Variable 1'}, yaxis: {title: 'Variable 2'}, zaxis: {title: 'Energia (W)'} };\n        }\n        Plotly.react('plot-v2-fin', traces, layout, {responsive: true});\n    };\n    scope.$watch('msg', function(msg) {\n        if(!msg || !msg.payload) return;\n        if(msg.payload.command === 'init') {\n            scope.mesh = {x: msg.payload.x, y: msg.payload.y, z: msg.payload.z};\n            scope.route = {x:[], y:[], z:[]};\n            scope.color = msg.payload.color;\n            scope.renderPlot();\n        } else if(msg.payload.command === 'add_point') {\n            if(typeof Plotly === 'undefined') return;\n            var pt = msg.payload.pt;\n            scope.route.x.push(pt.v1); scope.route.y.push(pt.v2); scope.route.z.push(pt.w);\n            if(scope.view2d) {\n                Plotly.extendTraces('plot-v2-fin', { x: [[pt.v1]], y: [[pt.v2]] }, [1]);\n            } else {\n                Plotly.extendTraces('plot-v2-fin', { x: [[pt.v1]], y: [[pt.v2]], z: [[pt.w]] }, [1]);\n            }\n        } else if(msg.payload.command === 'toggle_view') {\n            scope.view2d = !scope.view2d;\n            scope.renderPlot();\n        }\n    });\n})(scope);\n</script>",
+        "storeOutMessages": true,
+        "fwdInMessages": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 1460,
+        "y": 360,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "9caceb4290435d15",
+        "type": "ui_gauge",
+        "z": "b4f5a7c4e0317a3c",
+        "name": "Medidor Variable 1",
+        "group": "grupo_v2_final",
+        "order": 4,
+        "width": "6",
+        "height": "3",
+        "gtype": "gage",
+        "title": "Variable 1",
+        "label": "",
+        "format": "{{value}}",
+        "min": 0,
+        "max": "700",
+        "colors": [
+            "#00b500",
+            "#e6e600",
+            "#ca3838"
+        ],
+        "seg1": "",
+        "seg2": "",
+        "diff": false,
+        "className": "",
+        "x": 1440,
+        "y": 400,
+        "wires": []
+    },
+    {
+        "id": "45539fb141d1ed51",
+        "type": "ui_gauge",
+        "z": "b4f5a7c4e0317a3c",
+        "name": "Medidor Variable 2",
+        "group": "grupo_v2_final",
+        "order": 5,
+        "width": "6",
+        "height": "3",
+        "gtype": "gage",
+        "title": "Variable 2",
+        "label": "",
+        "format": "{{value}}",
+        "min": 0,
+        "max": "400",
+        "colors": [
+            "#00b500",
+            "#e6e600",
+            "#ca3838"
+        ],
+        "seg1": "",
+        "seg2": "",
+        "diff": false,
+        "className": "",
+        "x": 1440,
+        "y": 440,
+        "wires": []
+    },
+    {
+        "id": "20fb8407892a18c4",
+        "type": "ui_template",
+        "z": "b4f5a7c4e0317a3c",
+        "group": "grupo_v2_final",
+        "name": "Panel de Progreso V2",
+        "order": 6,
+        "width": "12",
+        "height": "3",
+        "format": "<div style=\"display:flex; flex-direction:row; justify-content:center; align-items:center; height:100%; background:#f4f4f4; border-radius:8px; box-sizing:border-box; padding:10px;\">\n    <div style=\"flex: 1; text-align:center;\">\n        <div style=\"font-size:14px; color:#666; font-weight:bold; text-transform:uppercase;\">Progreso del Agente</div>\n        <div style=\"font-size:42px; font-weight:bold; color:#333; line-height:1; margin-top:8px;\">{{msg.payload.paso !== undefined ? msg.payload.paso : '-'}}</div>\n    </div>\n    <div style=\"width:2px; height:80%; background:#ccc;\"></div>\n    <div style=\"flex: 1; text-align:center;\">\n        <div style=\"font-size:14px; color:#666; font-weight:bold; text-transform:uppercase;\">Energia Utilizada (W)</div>\n        <div style=\"font-size:42px; font-weight:bold; color:#2ca02c; line-height:1; margin-top:8px;\">{{msg.payload.w !== undefined ? msg.payload.w : '-'}}</div>\n    </div>\n</div>",
+        "storeOutMessages": true,
+        "fwdInMessages": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 1460,
+        "y": 480,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "a96e76133fee7b14",
+        "type": "ui_template",
+        "z": "b4f5a7c4e0317a3c",
+        "group": "grupo_v2_final",
+        "name": "Grafica de Evolucion V2",
+        "order": 7,
+        "width": "12",
+        "height": "5",
+        "format": "<script src=\"https://cdn.plot.ly/plotly-2.32.0.min.js\"></script>\n<div id=\"line-v2-fin\" style=\"width:100%; height:100%; min-height:200px;\"></div>\n<script>\n(function(scope) {\n    scope.$watch('msg', function(msg) {\n        if(!msg || !msg.payload) return;\n        if(msg.payload.command === 'init_2d') {\n            var tryInitLine = function() {\n                if(typeof Plotly === 'undefined') { setTimeout(tryInitLine, 200); return; }\n                var trace = { x: [], y: [], mode: 'lines', line: {color: '#2ca02c', width: 2} };\n                var layout = { margin: {l:50, r:20, b:40, t:20}, xaxis: {title: 'Tiempo de Simulacion'}, yaxis: {title: 'Consumo (W)'} };\n                Plotly.newPlot('line-v2-fin', [trace], layout, {responsive:true});\n            };\n            tryInitLine();\n        }\n        else if(msg.payload.command === 'add_point_2d') {\n            if(typeof Plotly !== 'undefined') {\n                Plotly.extendTraces('line-v2-fin', { x: [[msg.payload.x]], y: [[msg.payload.y]] }, [0]);\n            }\n        }\n    });\n})(scope);\n</script>",
+        "storeOutMessages": true,
+        "fwdInMessages": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 1470,
+        "y": 520,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "d28a4d04be03e605",
+        "type": "ui_template",
+        "z": "b4f5a7c4e0317a3c",
+        "group": "grupo_v2_final",
+        "name": "Mejores Resultados V2",
+        "order": 8,
+        "width": "12",
+        "height": "6",
+        "format": "<script src=\"https://cdn.plot.ly/plotly-2.32.0.min.js\"></script>\n<div id=\"top5-v2-fin\" style=\"width:100%; height:100%; min-height:240px;\"></div>\n<script>\n(function(scope) {\n    var getLayout = function() {\n        return {\n            title: 'Los 5 Diseños mas Eficientes',\n            margin: {l:70, r:30, b:40, t:40},\n            xaxis: {\n                title: 'Consumo entre 20W y 23W',\n                range: [20, 23],\n                autorange: false\n            },\n            yaxis: {\n                type: 'category',\n                autorange: 'reversed'\n            },\n            plot_bgcolor: '#f9f9f9'\n        };\n    };\n    scope.$watch('msg', function(msg) {\n        if(!msg || !msg.payload) return;\n        if(msg.payload.command === 'init_top5') {\n            var tryInitTop = function() {\n                if(typeof Plotly === 'undefined') { setTimeout(tryInitTop, 200); return; }\n                Plotly.newPlot('top5-v2-fin', [], getLayout(), {responsive:true});\n            };\n            tryInitTop();\n        }\n        else if(msg.payload.command === 'update_top5') {\n            if(typeof Plotly === 'undefined') return;\n            var data = msg.payload.data;\n            var x_vals = data.map(function(d) { return d.w; });\n            var y_vals = data.map(function(d) { return 'Paso ' + d.paso; });\n            var trace = {\n                x: x_vals,\n                y: y_vals,\n                type: 'bar',\n                orientation: 'h',\n                marker: { color: '#2ca02c' },\n                text: x_vals.map(function(v) { return v.toFixed(3) + ' W'; }),\n                hoverinfo: 'text',\n                textposition: 'inside',\n                insidetextanchor: 'end',\n                textfont: {color: 'white', size: 14}\n            };\n            Plotly.react('top5-v2-fin', [trace], getLayout());\n        }\n    });\n})(scope);\n</script>",
+        "storeOutMessages": true,
+        "fwdInMessages": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 1460,
+        "y": 560,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "grupo_v1_final",
+        "type": "ui_group",
+        "name": "Agente 1: Malla V1",
+        "tab": "tab_sim_final",
+        "order": 1,
+        "disp": true,
+        "width": "12",
+        "collapse": false
+    },
+    {
+        "id": "grupo_v2_final",
+        "type": "ui_group",
+        "name": "Agente 2: Malla V2",
+        "tab": "tab_sim_final",
+        "order": 2,
+        "disp": true,
+        "width": "12",
+        "collapse": false
+    },
+    {
+        "id": "tab_sim_final",
+        "type": "ui_tab",
+        "name": "Evaluación RL",
+        "icon": "military_tech",
+        "order": 7,
+        "disabled": false,
+        "hidden": false
+    },
+    {
+        "id": "669222c597956556",
+        "type": "global-config",
+        "env": [],
+        "modules": {
+            "node-red-dashboard": "3.6.6"
+        }
+    }
+]
